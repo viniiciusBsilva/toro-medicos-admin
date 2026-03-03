@@ -143,16 +143,20 @@ export function AdminSidebar() {
       </div>
 
       {/* Logout */}
-      <div className="flex flex-col items-center gap-3 border-t border-outline p-3">
+      <div className="flex justify-center border-t border-outline p-3">
         <button
           type="button"
           onClick={handleLogout}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#E00000] text-white transition-colors hover:bg-[#c20000]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
           title="Sair"
         >
           <LogOut className="h-5 w-5" />
         </button>
-        <p className="text-center text-xs text-[#888888]">
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-outline px-4 py-3">
+        <p className="text-center text-xs text-muted-foreground">
           Powered by Fraktal Softwares
         </p>
       </div>

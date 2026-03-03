@@ -7,7 +7,6 @@ import { ChevronLeft, ChevronDown, ChevronUp, ChevronRight, ImageIcon } from "lu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  listarEquipe,
   getPermissoesAdmin,
   salvarPermissoes,
   deleteAdmin,
@@ -133,7 +132,6 @@ export function EquipeClient({ membrosIniciais }: { membrosIniciais: MembroEquip
   const router = useRouter();
   const [membros, setMembros] = useState<MembroEquipe[]>(membrosIniciais);
   const [selected, setSelected] = useState<MembroEquipe | null>(membrosIniciais[0] ?? null);
-  const [permissoes, setPermissoes] = useState<AdminPermissoes | null>(null);
   const [payload, setPayload] = useState<PermissoesPayload>(toPayload(null));
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Configurações: true,
@@ -166,12 +164,10 @@ export function EquipeClient({ membrosIniciais }: { membrosIniciais: MembroEquip
 
   useEffect(() => {
     if (!selected) {
-      setPermissoes(null);
       setPayload(toPayload(null));
       return;
     }
     getPermissoesAdmin(selected.id_admin).then((p) => {
-      setPermissoes(p);
       setPayload(toPayload(p));
     });
   }, [selected?.id_admin]);

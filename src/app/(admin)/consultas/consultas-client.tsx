@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { listarConsultas, type ListaConsultasResult } from "./actions";
+import type { ListaConsultasResult } from "./actions";
 
 const STATUS_BADGE: Record<string, string> = {
   realizada: "bg-[#D2E8B0]",
@@ -61,12 +60,18 @@ export function ConsultasClient({ initialData, initialAnoMes }: Props) {
   const [ano, mes] = initialAnoMes.split("-").map(Number);
   const mesLabel = MESES[mes - 1] ?? "—";
 
-  const { consultas, total, page, totalPages } = initialData;
+  const { consultas, page, totalPages } = initialData;
 
   function buildParams(updates: { page?: number; q?: string; anoMes?: string }) {
     const p = new URLSearchParams(searchParams.toString());
-    if (updates.page !== undefined) (updates.page > 1 ? p.set("page", String(updates.page)) : p.delete("page"));
-    if (updates.q !== undefined) (updates.q ? p.set("q", updates.q) : p.delete("q"));
+    if (updates.page !== undefined) {
+      if (updates.page > 1) p.set("page", String(updates.page));
+      else p.delete("page");
+    }
+    if (updates.q !== undefined) {
+      if (updates.q) p.set("q", updates.q);
+      else p.delete("q");
+    }
     if (updates.anoMes !== undefined) p.set("anoMes", updates.anoMes);
     return p.toString();
   }
