@@ -46,8 +46,7 @@ export function AdminSidebar() {
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    await router.push("/login");
   }
 
   const width = collapsed ? "w-[72px]" : "w-60";

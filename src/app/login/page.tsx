@@ -52,8 +52,7 @@ export default function LoginPage() {
         router.push("/acesso-negado");
         return;
       }
-      router.push("/dashboard");
-      router.refresh();
+      await router.push("/dashboard");
     } catch {
       toast.error("Erro ao conectar. Tente novamente.");
     } finally {
