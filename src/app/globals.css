@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --text-bodyText: #313849;
+    --text-lessImportantText: #3E4B66;
+    --font-size-heading-xs: 20px;
+    --font-size-body-md: 16px;
+    --chart-1: #BA0001;
+    --chart-2: #3E4B66;
+    --background: 246 247 249;
+    --foreground: 14 16 21;
+    --card: 0 0 0 0;
+    --card-foreground: 14 16 21;
+    --popover: 0 0 0 0;
+    --popover-foreground: 14 16 21;
+    --primary: 186 0 1;
+    --primary-foreground: 255 255 255;
+    --secondary: 246 247 249;
+    --secondary-foreground: 14 16 21;
+    --muted: 246 247 249;
+    --muted-foreground: 107 114 128;
+    --accent: 246 247 249;
+    --accent-foreground: 14 16 21;
+    --destructive: 217 45 32;
+    --destructive-foreground: 255 255 255;
+    --border: 225 234 236;
+    --input: 225 234 236;
+    --ring: 186 0 1;
+    --radius: 0.625rem;
+  }
+  .dark {
+    --background: 14 16 21;
+    --foreground: 246 247 249;
+    --card: 14 16 21;
+    --card-foreground: 246 247 249;
+    --popover: 14 16 21;
+    --popover-foreground: 246 247 249;
+    --primary: 186 0 1;
+    --primary-foreground: 255 255 255;
+    --secondary: 38 39 42;
+    --secondary-foreground: 246 247 249;
+    --muted: 38 39 42;
+    --muted-foreground: 107 114 128;
+    --accent: 38 39 42;
+    --accent-foreground: 246 247 249;
+    --destructive: 217 45 32;
+    --destructive-foreground: 255 255 255;
+    --border: 38 39 42;
+    --input: 38 39 42;
+    --ring: 186 0 1;
+  }
+}
+
+@layer base {
+  html {
+    font-family: "Poppins", var(--font-poppins), sans-serif;
+    color: #0E1015;
+  }
+  body {
+    font-family: "Poppins", var(--font-poppins), sans-serif;
+    color: #0E1015;
+    @apply bg-background antialiased;
+  }
+}
