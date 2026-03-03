@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+
+const SEND_PASSWORD_RESET_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-password-reset`;
 
 export default function RecuperarSenhaPage() {
   const [email, setEmail] = useState("");
@@ -21,12 +22,18 @@ export default function RecuperarSenhaPage() {
     }
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/login/redefinir-senha`,
+      const res = await fetch(SEND_PASSWORD_RESET_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: email.trim() }),
       });
-      if (error) {
-        toast.error(error.message);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message ?? "Falha ao enviar e-mail. Tente novamente.");
         return;
       }
       setSent(true);
@@ -76,7 +83,7 @@ export default function RecuperarSenhaPage() {
           />
         </div>
         <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? "Enviando…" : "Entrar"}
+          {loading ? "Enviando…" : "Enviar"}
         </Button>
         <p className="text-center">
           <Link

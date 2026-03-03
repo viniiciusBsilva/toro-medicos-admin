@@ -18,15 +18,41 @@ export default function RedefinirSenhaPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    const setSession = () => {
+
+    const updateSession = () => {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setHasSession(!!session);
       });
     };
-    setSession();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => setSession());
+
+    const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    const hasRecoveryHash = hash.includes("type=recovery") && hash.includes("access_token=");
+
+    if (hasRecoveryHash) {
+      const params = new URLSearchParams(hash);
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+
+      if (access_token && refresh_token) {
+        supabase.auth
+          .setSession({ access_token, refresh_token })
+          .then(() => {
+            updateSession();
+            window.history.replaceState(null, "", window.location.pathname);
+          })
+          .catch(() => setHasSession(false));
+        return;
+      }
+    }
+
+    updateSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+        updateSession();
+      }
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -48,8 +74,7 @@ export default function RedefinirSenhaPage() {
         toast.error(error.message);
         return;
       }
-      router.push("/login/senha-alterada");
-      router.refresh();
+      await router.push("/login/senha-alterada");
     } catch {
       toast.error("Erro ao salvar. Tente novamente.");
     } finally {
