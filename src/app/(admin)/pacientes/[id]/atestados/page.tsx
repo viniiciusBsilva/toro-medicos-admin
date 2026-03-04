@@ -11,5 +11,11 @@ export default async function AtestadosPage({
   const paciente = await getDetalhesPaciente(id);
   if (!paciente) notFound();
   const atestados = await getAtestadosPaciente(paciente.id_user);
-  return <AtestadosClient pacienteId={id} atestados={atestados} />;
+  return (
+    <AtestadosClient
+      pacienteId={id}
+      pacienteNome={paciente.nome}
+      atestados={atestados}
+    />
+  );
 }

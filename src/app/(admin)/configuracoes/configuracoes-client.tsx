@@ -179,26 +179,23 @@ export function ConfiguracoesClient({ perfil, config }: Props) {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>WhatsApp do suporte</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative flex items-center">
+        <CardContent className="pt-6">
+          <h3 className="text-base font-semibold text-[#0E1015]">WhatsApp do suporte</h3>
+          <p className="mt-1 text-sm text-[#0E1015]">Número do WhatsApp</p>
+          <div className="relative mt-2 flex items-center">
             <Input
               readOnly
               value={config.whatsapp_suporte ? formatTelefone(config.whatsapp_suporte) : ""}
               placeholder="(99) 99999-9999"
-              className={`bg-muted/50 text-[#0E1015] ${pode("editar_num_wpp_suporte") ? "pr-10" : ""}`}
+              className="rounded-md border border-border bg-muted/50 pr-10 text-[#0E1015]"
             />
-            {pode("editar_num_wpp_suporte") && (
-              <Link
-                href="/configuracoes/whatsapp"
-                className="absolute right-3 text-text-secondary hover:text-text-primary"
-                title="Editar WhatsApp"
-              >
-                <Pencil className="h-4 w-4" />
-              </Link>
-            )}
+            <Link
+              href="/configuracoes/whatsapp"
+              className="absolute right-3 text-text-secondary hover:text-text-primary"
+              title="Editar WhatsApp"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
           </div>
         </CardContent>
       </Card>

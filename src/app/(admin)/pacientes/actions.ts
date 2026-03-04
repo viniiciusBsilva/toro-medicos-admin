@@ -375,6 +375,10 @@ export type ExameItem = {
   data_consulta: string | null;
   arquivo_url: string | null;
   created_at: string;
+  /** Conteúdo texto do documento (consulta_documento). Usado para gerar PDF quando não há arquivo_url. */
+  conteudo: string | null;
+  /** Conteúdo estruturado (consulta_documento). Usado para gerar PDF quando não há arquivo_url. */
+  conteudo_json: unknown | null;
 };
 
 export async function getExamesPaciente(
@@ -391,7 +395,7 @@ export async function getExamesPaciente(
   if (idsConsulta.length > 0) {
     const { data: pedidos, error: errPedidos } = await service
       .from("consulta_documento")
-      .select("id, created_at, arquivo_url, conteudo, id_consulta")
+      .select("id, created_at, arquivo_url, conteudo, conteudo_json, id_consulta")
       .eq("tipo", "pedido_exame")
       .in("id_consulta", idsConsulta);
   if (!errPedidos && pedidos?.length) {
@@ -413,7 +417,7 @@ export async function getExamesPaciente(
         nomePorIdUser.get(m.id_user) ?? "—",
       ])
     );
-    for (const p of pedidos as Array<{ id: string; created_at: string; arquivo_url: string | null; conteudo: string | null; id_consulta: string }>) {
+    for (const p of pedidos as Array<{ id: string; created_at: string; arquivo_url: string | null; conteudo: string | null; conteudo_json: unknown; id_consulta: string }>) {
       const cons = consultaPorId.get(p.id_consulta);
       const titulo = (p.conteudo?.trim() || "Pedido de exame").split("\n")[0];
       items.push({
@@ -424,6 +428,8 @@ export async function getExamesPaciente(
         data_consulta: cons?.datahora ?? null,
         arquivo_url: p.arquivo_url ?? null,
         created_at: p.created_at,
+        conteudo: p.conteudo ?? null,
+        conteudo_json: p.conteudo_json ?? null,
       });
     }
   }
@@ -443,6 +449,8 @@ export async function getExamesPaciente(
         data_consulta: null,
         arquivo_url: e.url_exame,
         created_at: e.created_at,
+        conteudo: null,
+        conteudo_json: null,
       });
     }
   }
@@ -457,48 +465,69 @@ export type DocumentoItem = {
   data_emissao: string;
   arquivo_url: string | null;
   nome_arquivo: string | null;
+  medico_nome: string | null;
+  /** Conteúdo texto (consulta_documento). Usado para gerar PDF quando não há arquivo_url. */
+  conteudo: string | null;
+  /** Conteúdo estruturado (consulta_documento). Usado para gerar PDF quando não há arquivo_url. */
+  conteudo_json: unknown | null;
 };
 
-export async function getAtestadosPaciente(idUser: string): Promise<DocumentoItem[]> {
-  const service = createServiceClient();
+async function getDocumentosPacienteComMedico(
+  service: ReturnType<typeof createServiceClient>,
+  idUser: string,
+  tipo: "atestado" | "receita"
+): Promise<DocumentoItem[]> {
   const { data: consultas } = await service
     .from("consulta")
-    .select("id")
+    .select("id, id_medico, datahora")
     .eq("id_paciente", idUser);
   const idsConsulta = (consultas ?? []).map((c: { id: string }) => c.id);
   if (idsConsulta.length === 0) return [];
   const { data: docs } = await service
     .from("consulta_documento")
-    .select("id, created_at, arquivo_url")
-    .eq("tipo", "atestado")
+    .select("id, created_at, arquivo_url, conteudo, conteudo_json, id_consulta")
+    .eq("tipo", tipo)
     .in("id_consulta", idsConsulta)
     .order("created_at", { ascending: false });
-  return (docs ?? []).map((d: { id: string; created_at: string; arquivo_url: string | null }) => ({
-    id: d.id,
-    data_emissao: d.created_at,
-    arquivo_url: d.arquivo_url,
-    nome_arquivo: d.arquivo_url ? d.arquivo_url.split("/").pop() ?? null : null,
-  }));
+  if (!docs?.length) return [];
+  const consultasMap = new Map(
+    (consultas as Array<{ id: string; id_medico: string; datahora: string }>).map((c) => [c.id, { id_medico: c.id_medico, datahora: c.datahora }])
+  );
+  const idsMedico = [...new Set(
+    (docs as Array<{ id_consulta: string }>)
+      .map((d) => consultasMap.get(d.id_consulta)?.id_medico)
+      .filter(Boolean)
+  )] as string[];
+  let medicoPorId = new Map<string, string>();
+  if (idsMedico.length > 0) {
+    const { data: medicos } = await service.from("user_medico").select("id, id_user").in("id", idsMedico);
+    const idUsers = (medicos ?? []).map((m: { id_user: string }) => m.id_user);
+    const { data: users } = await service.from("user").select("id, nome").in("id", idUsers);
+    const nomePorUser = new Map((users ?? []).map((u: { id: string; nome: string | null }) => [u.id, u.nome ?? "—"]));
+    medicoPorId = new Map(
+      (medicos ?? []).map((m: { id: string; id_user: string }) => [m.id, nomePorUser.get(m.id_user) ?? "—"])
+    );
+  }
+  return (docs as Array<{ id: string; created_at: string; arquivo_url: string | null; conteudo: string | null; conteudo_json: unknown; id_consulta: string }>).map((d) => {
+    const cons = consultasMap.get(d.id_consulta);
+    return {
+      id: d.id,
+      data_emissao: d.created_at,
+      arquivo_url: d.arquivo_url,
+      nome_arquivo: d.arquivo_url ? d.arquivo_url.split("/").pop() ?? null : null,
+      medico_nome: cons ? (medicoPorId.get(cons.id_medico) ?? null) : null,
+      conteudo: d.conteudo ?? null,
+      conteudo_json: d.conteudo_json ?? null,
+    };
+  });
+}
+
+export async function getAtestadosPaciente(idUser: string): Promise<DocumentoItem[]> {
+  const service = createServiceClient();
+  return getDocumentosPacienteComMedico(service, idUser, "atestado");
 }
 
 export async function getReceitasPaciente(idUser: string): Promise<DocumentoItem[]> {
   const service = createServiceClient();
-  const { data: consultas } = await service
-    .from("consulta")
-    .select("id")
-    .eq("id_paciente", idUser);
-  const idsConsulta = (consultas ?? []).map((c: { id: string }) => c.id);
-  if (idsConsulta.length === 0) return [];
-  const { data: docs } = await service
-    .from("consulta_documento")
-    .select("id, created_at, arquivo_url")
-    .eq("tipo", "receita")
-    .in("id_consulta", idsConsulta)
-    .order("created_at", { ascending: false });
-  return (docs ?? []).map((d: { id: string; created_at: string; arquivo_url: string | null }) => ({
-    id: d.id,
-    data_emissao: d.created_at,
-    arquivo_url: d.arquivo_url,
-    nome_arquivo: d.arquivo_url ? d.arquivo_url.split("/").pop() ?? null : null,
-  }));
+  return getDocumentosPacienteComMedico(service, idUser, "receita");
 }

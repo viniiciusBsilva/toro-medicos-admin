@@ -17,6 +17,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { DetalhesConsulta } from "../actions";
+import type { DocItem } from "../actions";
+import { gerarPdfDocumento, documentoTemDados } from "@/lib/pdf-documento";
 
 const STATUS_BADGE: Record<string, string> = {
   realizada: "bg-[#D2E8B0]",
@@ -69,6 +71,39 @@ export function DetalhesConsultaClient({ detalhes }: Props) {
   });
   const d = detalhes;
   const tipoLabel = d.tipo === "retorno" ? "Retorno" : "Normal";
+
+  function handleVisualizarDocumentos(
+    docs: DocItem[],
+    tipo: "receita" | "atestado" | "pedido_exame"
+  ) {
+    const comUrl = docs.find((r) => r.arquivo_url);
+    if (comUrl?.arquivo_url) {
+      window.open(comUrl.arquivo_url, "_blank");
+      return;
+    }
+    const comDados = docs.find((r) =>
+      documentoTemDados({
+        arquivo_url: r.arquivo_url,
+        conteudo: r.conteudo,
+        conteudo_json: r.conteudo_json,
+      })
+    );
+    if (!comDados) return;
+    const cabecalho = {
+      medico_nome: d.medico.nome,
+      paciente_nome: d.paciente.nome,
+      data_emissao: comDados.created_at,
+    };
+    const blob = gerarPdfDocumento(
+      tipo,
+      comDados.conteudo ?? null,
+      comDados.conteudo_json ?? null,
+      cabecalho
+    );
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  }
 
   return (
     <div className="space-y-8">
@@ -237,25 +272,19 @@ export function DetalhesConsultaClient({ detalhes }: Props) {
                 ))
               )}
             </ul>
-            {d.documentos.receita.length > 0 && (() => {
-              const primeiroComUrl = d.documentos.receita.find((r) => r.arquivo_url);
-              return (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <Button size="sm" className="bg-primary hover:bg-primary-hover" asChild={!!primeiroComUrl}>
-                    {primeiroComUrl ? (
-                      <a href={primeiroComUrl.arquivo_url!} target="_blank" rel="noopener noreferrer">
-                        Visualizar
-                      </a>
-                    ) : (
-                      <span>Visualizar</span>
-                    )}
-                  </Button>
-                  <button type="button" className="text-sm font-medium text-primary hover:underline">
-                    Compartilhar
-                  </button>
-                </div>
-              );
-            })()}
+            {d.documentos.receita.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary-hover"
+                  onClick={() =>
+                    handleVisualizarDocumentos(d.documentos.receita, "receita")
+                  }
+                >
+                  Visualizar
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Atestados: lista conforme registros na tabela consulta_documento */}
@@ -288,25 +317,19 @@ export function DetalhesConsultaClient({ detalhes }: Props) {
                 ))
               )}
             </ul>
-            {d.documentos.atestado.length > 0 && (() => {
-              const primeiroComUrl = d.documentos.atestado.find((a) => a.arquivo_url);
-              return (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <Button size="sm" className="bg-primary hover:bg-primary-hover" asChild={!!primeiroComUrl}>
-                    {primeiroComUrl ? (
-                      <a href={primeiroComUrl.arquivo_url!} target="_blank" rel="noopener noreferrer">
-                        Visualizar
-                      </a>
-                    ) : (
-                      <span>Visualizar</span>
-                    )}
-                  </Button>
-                  <button type="button" className="text-sm font-medium text-primary hover:underline">
-                    Compartilhar
-                  </button>
-                </div>
-              );
-            })()}
+            {d.documentos.atestado.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary-hover"
+                  onClick={() =>
+                    handleVisualizarDocumentos(d.documentos.atestado, "atestado")
+                  }
+                >
+                  Visualizar
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Pedidos de exames: título + status; "Anexos do paciente:"; lista de arquivos com download; depois Visualizar e Compartilhar */}
@@ -340,29 +363,22 @@ export function DetalhesConsultaClient({ detalhes }: Props) {
                 ))
               )}
             </ul>
-            {d.documentos.pedidos_exame.length > 0 && (() => {
-              const primeiroComUrl = d.documentos.pedidos_exame.find((p) => p.arquivo_url);
-              return (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <Button
-                    size="sm"
-                    className="bg-primary hover:bg-primary-hover"
-                    asChild={!!primeiroComUrl}
-                  >
-                    {primeiroComUrl ? (
-                      <a href={primeiroComUrl.arquivo_url!} target="_blank" rel="noopener noreferrer">
-                        Visualizar
-                      </a>
-                    ) : (
-                      <span>Visualizar</span>
-                    )}
-                  </Button>
-                  <button type="button" className="text-sm font-medium text-primary hover:underline">
-                    Compartilhar
-                  </button>
-                </div>
-              );
-            })()}
+            {d.documentos.pedidos_exame.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary-hover"
+                  onClick={() =>
+                    handleVisualizarDocumentos(
+                      d.documentos.pedidos_exame,
+                      "pedido_exame"
+                    )
+                  }
+                >
+                  Visualizar
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

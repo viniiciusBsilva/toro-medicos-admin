@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Filter, ChevronLeft, ChevronRight, AlertTriangle, ChevronUp } from "lucide-react";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import type { MedicoListItem, ListaMedicosResult, StatusMedico } from "./actions";
+import { listarMedicos, type ListaMedicosResult, type StatusMedico } from "./actions";
 
 const STATUS_OPCOES: { value: StatusMedico; label: string }[] = [
   { value: "aprovado", label: "Aprovado" },
@@ -94,10 +94,60 @@ export function MedicosClient({
   const [localSearch, setLocalSearch] = useState(q);
   const [localStatus, setLocalStatus] = useState<StatusMedico[]>(statusFilters);
   const [localFiltro, setLocalFiltro] = useState(filtroParam);
+  const [data, setData] = useState<ListaMedicosResult>(initialData);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearingRef = useRef(false);
 
-  const { medicos, total, page, totalPages } = initialData;
+  const { medicos, total, page, totalPages } = data;
 
   const basePath = apenasPendentes ? "/medicos/pendentes" : "/medicos";
+
+  useEffect(() => {
+    if (clearingRef.current) {
+      if (!searchParams.get("q")) {
+        setLocalSearch("");
+        clearingRef.current = false;
+      }
+      return;
+    }
+    setLocalSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  async function aplicarBusca(
+    qValue: string | undefined,
+    pageNum: number = 1,
+    statusArr?: StatusMedico[],
+    filtroVal?: string
+  ) {
+    const status = statusArr !== undefined ? statusArr : (searchParams.get("status") ? searchParams.get("status")!.split(",").filter((x): x is StatusMedico => statusList.includes(x as StatusMedico)) : undefined);
+    const filtro = filtroVal !== undefined ? filtroVal : searchParams.get("filtro")?.trim();
+    const result = await listarMedicos(pageNum, qValue?.trim() || undefined, status?.length ? status : undefined, filtro?.trim() || undefined, apenasPendentes);
+    setData(result);
+  }
+
+  useEffect(() => {
+    const trimmed = localSearch.trim();
+    const currentQ = searchParams.get("q") ?? "";
+    if (trimmed === currentQ.trim()) return;
+    if (trimmed === "") {
+      startTransition(() => {
+        router.replace(`${basePath}?${buildParams({ q: undefined, page: 1 })}`);
+        aplicarBusca(undefined, 1);
+      });
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      startTransition(() => {
+        router.replace(`${basePath}?${buildParams({ q: trimmed, page: 1 })}`);
+        aplicarBusca(trimmed, 1);
+      });
+      debounceRef.current = null;
+    }, 280);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [localSearch]);
 
   function buildParams(updates: {
     q?: string;
@@ -119,38 +169,45 @@ export function MedicosClient({
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
+    const trimmed = localSearch.trim() || undefined;
     startTransition(() => {
-      router.push(`${basePath}?${buildParams({ q: localSearch.trim() || undefined, page: 1 })}`);
+      router.replace(`${basePath}?${buildParams({ q: trimmed, page: 1 })}`);
+      aplicarBusca(trimmed, 1);
     });
   }
 
   function handleFilterApply() {
+    const filtroVal = localFiltro.trim() || undefined;
     const statusStr = localStatus.length ? localStatus.join(",") : undefined;
+    const semFiltro = !filtroVal && !statusStr;
+    if (semFiltro) setLocalSearch("");
     startTransition(() => {
-      router.push(
+      router.replace(
         `${basePath}?${buildParams({
-          filtro: localFiltro.trim() || undefined,
+          q: semFiltro ? undefined : localSearch.trim() || undefined,
+          filtro: filtroVal,
           status: statusStr,
           page: 1,
         })}`
       );
-      setFilterOpen(false);
+      aplicarBusca(
+        semFiltro ? undefined : localSearch.trim() || undefined,
+        1,
+        localStatus.length ? localStatus : undefined,
+        filtroVal
+      );
     });
+    setFilterOpen(false);
   }
 
   function handleFilterClear() {
     setLocalStatus([]);
     setLocalFiltro("");
     startTransition(() => {
-      router.push(
-        `${basePath}?${buildParams({
-          filtro: undefined,
-          status: undefined,
-          page: 1,
-        })}`
-      );
-      setFilterOpen(false);
+      router.replace(`${basePath}?${buildParams({ q: localSearch.trim() || undefined, filtro: undefined, status: undefined, page: 1 })}`);
+      aplicarBusca(localSearch.trim() || undefined, 1, [], "");
     });
+    setFilterOpen(false);
   }
 
   function toggleStatus(s: StatusMedico) {
@@ -195,7 +252,17 @@ export function MedicosClient({
               type="search"
               placeholder="Pesquisar por nome ou e-mail"
               value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setLocalSearch(v);
+                if (!v.trim()) {
+                  clearingRef.current = true;
+                  startTransition(() => {
+                    router.replace(`${basePath}?${buildParams({ q: undefined, page: 1 })}`);
+                    aplicarBusca(undefined, 1);
+                  });
+                }
+              }}
               className="h-11 w-full rounded-full border border-outline bg-white pl-4 pr-11 text-[var(--text-bodyText)] placeholder:text-[var(--text-lessImportantText)]"
             />
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-lessImportantText)]" />
@@ -348,9 +415,13 @@ export function MedicosClient({
               variant="outline"
               size="icon"
               disabled={page <= 1 || isPending}
-              onClick={() =>
-                router.push(`${basePath}?${buildParams({ page: page - 1 })}`)
-              }
+              onClick={() => {
+                const newPage = page - 1;
+                startTransition(() => {
+                  router.replace(`${basePath}?${buildParams({ page: newPage })}`);
+                  aplicarBusca(searchParams.get("q") ?? undefined, newPage);
+                });
+              }}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -361,9 +432,13 @@ export function MedicosClient({
               variant="outline"
               size="icon"
               disabled={page >= totalPages || isPending}
-              onClick={() =>
-                router.push(`${basePath}?${buildParams({ page: page + 1 })}`)
-              }
+              onClick={() => {
+                const newPage = page + 1;
+                startTransition(() => {
+                  router.replace(`${basePath}?${buildParams({ page: newPage })}`);
+                  aplicarBusca(searchParams.get("q") ?? undefined, newPage);
+                });
+              }}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

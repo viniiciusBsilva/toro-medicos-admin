@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import type { PacienteListItem, ListaPacientesResult } from "./actions";
+import { listarPacientes, type ListaPacientesResult } from "./actions";
 
 type IdadeFilter = "0-12" | "13-55" | "56+";
 
@@ -49,8 +49,56 @@ export function PacientesClient({
   const [localSearch, setLocalSearch] = useState(q);
   const [localIdade, setLocalIdade] = useState<IdadeFilter[]>(idadeFilters);
   const [localCidade, setLocalCidade] = useState(cidadeParam);
+  const [data, setData] = useState<ListaPacientesResult>(initialData);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearingRef = useRef(false);
 
-  const { pacientes, total, page, totalPages } = initialData;
+  const { pacientes, total, page, totalPages } = data;
+
+  useEffect(() => {
+    if (clearingRef.current) {
+      if (!searchParams.get("q")) {
+        setLocalSearch("");
+        clearingRef.current = false;
+      }
+      return;
+    }
+    setLocalSearch(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  async function aplicarBusca(qValue: string | undefined, pageNum: number = 1, idadeArr?: IdadeFilter[], cidadeStr?: string) {
+    const idade = idadeArr !== undefined ? idadeArr : (searchParams.get("idade") ? (searchParams.get("idade")!.split(",").filter((x) => ["0-12", "13-55", "56+"].includes(x)) as IdadeFilter[]) : undefined);
+    const cidade = cidadeStr !== undefined ? cidadeStr : searchParams.get("cidade")?.trim();
+    const result = await listarPacientes(pageNum, qValue?.trim() || undefined, idade?.length ? idade : undefined, cidade?.trim() || undefined);
+    setData(result);
+  }
+
+  useEffect(() => {
+    const trimmed = localSearch.trim();
+    const currentQ = searchParams.get("q") ?? "";
+    if (trimmed === currentQ.trim()) return;
+    if (trimmed === "") {
+      clearingRef.current = true;
+      const params = buildParams({ q: undefined, page: 1 });
+      startTransition(() => {
+        router.replace(`/pacientes?${params}`);
+        aplicarBusca(undefined, 1);
+      });
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const params = buildParams({ q: trimmed, page: 1 });
+      startTransition(() => {
+        router.replace(`/pacientes?${params}`);
+        aplicarBusca(trimmed, 1);
+      });
+      debounceRef.current = null;
+    }, 280);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [localSearch]);
 
   function buildParams(updates: { q?: string; page?: number; idade?: string; cidade?: string }) {
     const p = new URLSearchParams(searchParams.toString());
@@ -63,26 +111,39 @@ export function PacientesClient({
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
+    const trimmed = localSearch.trim() || undefined;
     startTransition(() => {
-      router.push(`/pacientes?${buildParams({ q: localSearch.trim() || undefined, page: 1 })}`);
+      router.replace(`/pacientes?${buildParams({ q: trimmed, page: 1 })}`);
+      aplicarBusca(trimmed, 1);
     });
   }
 
   function handleFilterApply() {
+    const cidadeVal = localCidade.trim() || undefined;
     const idadeStr = localIdade.length ? localIdade.join(",") : undefined;
-    startTransition(() => {
-      router.push(`/pacientes?${buildParams({ cidade: localCidade.trim() || undefined, idade: idadeStr, page: 1 })}`);
-      setFilterOpen(false);
+    const semFiltro = !cidadeVal && !idadeStr;
+    if (semFiltro) setLocalSearch("");
+    const newParams = buildParams({
+      q: semFiltro ? undefined : localSearch.trim() || undefined,
+      cidade: cidadeVal,
+      idade: idadeStr,
+      page: 1,
     });
+    startTransition(() => {
+      router.replace(`/pacientes?${newParams}`);
+      aplicarBusca(semFiltro ? undefined : localSearch.trim() || undefined, 1, idadeStr ? (idadeStr.split(",") as IdadeFilter[]) : undefined, cidadeVal);
+    });
+    setFilterOpen(false);
   }
 
   function handleFilterClear() {
     setLocalIdade([]);
     setLocalCidade("");
     startTransition(() => {
-      router.push(`/pacientes?${buildParams({ cidade: undefined, idade: undefined, page: 1 })}`);
-      setFilterOpen(false);
+      router.replace(`/pacientes?${buildParams({ q: localSearch.trim() || undefined, cidade: undefined, idade: undefined, page: 1 })}`);
+      aplicarBusca(localSearch.trim() || undefined, 1, [], "");
     });
+    setFilterOpen(false);
   }
 
   return (
@@ -95,7 +156,17 @@ export function PacientesClient({
               type="search"
               placeholder="Pesquisar pacientes"
               value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setLocalSearch(v);
+                if (!v.trim()) {
+                  clearingRef.current = true;
+                  startTransition(() => {
+                    router.replace(`/pacientes?${buildParams({ q: undefined, page: 1 })}`);
+                    aplicarBusca(undefined, 1);
+                  });
+                }
+              }}
               className="h-11 w-full rounded-full border border-outline bg-white pl-4 pr-11 text-[var(--text-bodyText)] placeholder:text-[var(--text-lessImportantText)]"
             />
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-lessImportantText)]" />
@@ -229,7 +300,13 @@ export function PacientesClient({
               variant="outline"
               size="icon"
               disabled={page <= 1 || isPending}
-              onClick={() => router.push(`/pacientes?${buildParams({ page: page - 1 })}`)}
+              onClick={() => {
+                const newPage = page - 1;
+                startTransition(() => {
+                  router.replace(`/pacientes?${buildParams({ page: newPage })}`);
+                  aplicarBusca(searchParams.get("q") ?? undefined, newPage);
+                });
+              }}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -240,7 +317,13 @@ export function PacientesClient({
               variant="outline"
               size="icon"
               disabled={page >= totalPages || isPending}
-              onClick={() => router.push(`/pacientes?${buildParams({ page: page + 1 })}`)}
+              onClick={() => {
+                const newPage = page + 1;
+                startTransition(() => {
+                  router.replace(`/pacientes?${buildParams({ page: newPage })}`);
+                  aplicarBusca(searchParams.get("q") ?? undefined, newPage);
+                });
+              }}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

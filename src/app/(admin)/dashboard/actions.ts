@@ -56,7 +56,6 @@ export async function getDashboardData(anoMes: string): Promise<DashboardData> {
   const toStr = fim.toISOString().slice(0, 19);
 
   const [
-    countUser,
     countPacientes,
     countMedicos,
     consultasRes,
@@ -65,7 +64,6 @@ export async function getDashboardData(anoMes: string): Promise<DashboardData> {
     pacientesNascRes,
     lancamentosRes,
   ] = await Promise.all([
-    service.from("user").select("id", { count: "exact", head: true }),
     service.from("user_paciente").select("id", { count: "exact", head: true }),
     service.from("user_medico").select("id", { count: "exact", head: true }),
     service
@@ -87,9 +85,9 @@ export async function getDashboardData(anoMes: string): Promise<DashboardData> {
       .lte("competencia", fim.toISOString().slice(0, 10)),
   ]);
 
-  const totalUsuarios = countUser.count ?? 0;
   const totalPacientes = countPacientes.count ?? 0;
   const totalMedicos = countMedicos.count ?? 0;
+  const totalUsuarios = totalPacientes + totalMedicos;
 
   const consultas = (consultasRes.data ?? []) as Array<{ id: string; datahora: string; tipo: string; status: string; id_medico: string }>;
   const reembolsos = (reembolsosRes.data ?? []) as Array<{ id: string }>;
@@ -99,6 +97,8 @@ export async function getDashboardData(anoMes: string): Promise<DashboardData> {
   let consultasPlantao = 0;
   let consultasAgendadas = 0;
   consultas.forEach((c) => {
+    const status = String(c.status ?? "").trim().toLowerCase();
+    if (status !== "realizada") return;
     const t = String(c.tipo || "").toLowerCase();
     if (t.includes("plant") || t === "plantao") consultasPlantao++;
     else consultasAgendadas++;

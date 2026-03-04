@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,6 @@ export function FinanceiroClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [anoMes, setAnoMes] = useState(initialAnoMes);
-  const [busca, setBusca] = useState(searchParams.get("q") ?? "");
   const [indicadores, setIndicadores] = useState(initialIndicadores);
   const [medias, setMedias] = useState(initialMedias);
   const [aba, setAba] = useState<"repasses" | "reembolsos">("repasses");
@@ -95,10 +94,9 @@ export function FinanceiroClient({
   const [ano, mes] = anoMes.split("-").map(Number);
   const mesLabel = MESES[mes - 1] ?? "—";
 
-  function atualizarUrl(params: { anoMes?: string; q?: string }) {
+  function atualizarUrl(anoMesNext?: string) {
     const p = new URLSearchParams(searchParams.toString());
-    if (params.anoMes) p.set("anoMes", params.anoMes);
-    if (params.q !== undefined) (params.q ? p.set("q", params.q) : p.delete("q"));
+    if (anoMesNext) p.set("anoMes", anoMesNext);
     router.push(`/financeiro?${p.toString()}`, { scroll: false });
   }
 
@@ -108,8 +106,8 @@ export function FinanceiroClient({
     const novoAno = m === 1 ? a - 1 : a;
     const next = `${novoAno}-${String(novoMes).padStart(2, "0")}`;
     setAnoMes(next);
-    atualizarUrl({ anoMes: next });
-    recarregarTudo(next, busca);
+    atualizarUrl(next);
+    recarregarTudo(next);
   }
 
   function handleProximoMes() {
@@ -118,17 +116,17 @@ export function FinanceiroClient({
     const novoAno = m === 12 ? a + 1 : a;
     const next = `${novoAno}-${String(novoMes).padStart(2, "0")}`;
     setAnoMes(next);
-    atualizarUrl({ anoMes: next });
-    recarregarTudo(next, busca);
+    atualizarUrl(next);
+    recarregarTudo(next);
   }
 
-  function recarregarTudo(am: string, q: string) {
+  function recarregarTudo(am: string) {
     startTransition(async () => {
       const [ind, mediasRes, rep, reemb] = await Promise.all([
         getIndicadoresFinanceiros(am),
         getMediaConsultasPorEspecialidade(am),
-        listarRepasses(1, am, q),
-        listarReembolsos(1, am, q),
+        listarRepasses(1, am, ""),
+        listarReembolsos(1, am, ""),
       ]);
       setIndicadores(ind);
       setMedias(mediasRes);
@@ -141,12 +139,6 @@ export function FinanceiroClient({
       setReembolsosTotalPages(reemb.totalPages);
       setReembolsosPage(1);
     });
-  }
-
-  function handleBusca(e: React.FormEvent) {
-    e.preventDefault();
-    atualizarUrl({ q: busca || undefined });
-    recarregarTudo(anoMes, busca);
   }
 
   function openModalTaxas() {
@@ -183,7 +175,7 @@ export function FinanceiroClient({
   function trocarPaginaRepasses(pagina: number) {
     setRepassesPage(pagina);
     startTransition(async () => {
-      const r = await listarRepasses(pagina, anoMes, busca);
+      const r = await listarRepasses(pagina, anoMes, "");
       setRepasses(r.repasses);
     });
   }
@@ -191,7 +183,7 @@ export function FinanceiroClient({
   function trocarPaginaReembolsos(pagina: number) {
     setReembolsosPage(pagina);
     startTransition(async () => {
-      const r = await listarReembolsos(pagina, anoMes, busca);
+      const r = await listarReembolsos(pagina, anoMes, "");
       setReembolsos(r.reembolsos);
     });
   }
@@ -203,22 +195,9 @@ export function FinanceiroClient({
 
   return (
     <div className="space-y-8">
-      {/* Header: título em cima; busca (campo estendido, ícone à direita) e mês em 3 caixas */}
       <header className="space-y-4">
         <h1 className="text-2xl font-semibold text-[#0E1015]">Gestão financeira</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <form onSubmit={handleBusca} className="min-w-0 flex-1">
-            <div className="relative">
-              <Input
-                type="search"
-                placeholder="Pesquisar por cidade ou estado"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="h-11 w-full rounded-full border border-outline bg-white pl-4 pr-11 text-[var(--text-bodyText)] placeholder:text-[var(--text-lessImportantText)]"
-              />
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-lessImportantText)]" />
-            </div>
-          </form>
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="flex items-center gap-1">
             <button
               type="button"

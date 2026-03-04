@@ -112,11 +112,25 @@ export async function getIndicadoresFinanceiros(
   const taxa_medico_percent = taxas?.taxa_medico_percent ?? 0;
   const taxa_paciente_percent = taxas?.taxa_paciente_percent ?? 0;
 
-  const { data: lancamentos } = await service
-    .from("financeiro_lancamento")
-    .select("receita_plataforma_valor, total_pago_paciente, valor_consulta")
-    .gte("competencia", inicioStr)
-    .lte("competencia", fimStr);
+  const fromStr = inicio.toISOString().slice(0, 19);
+  const toStr = fim.toISOString().slice(0, 19);
+
+  const [
+    { data: lancamentos },
+    { data: consultasPeriodo },
+  ] = await Promise.all([
+    service
+      .from("financeiro_lancamento")
+      .select("receita_plataforma_valor, total_pago_paciente, valor_consulta")
+      .gte("competencia", inicioStr)
+      .lte("competencia", fimStr),
+    service
+      .from("consulta")
+      .select("valor_consulta")
+      .gte("datahora", fromStr)
+      .lte("datahora", toStr),
+  ]);
+
   const rows = (lancamentos ?? []) as Array<{
     receita_plataforma_valor: number;
     total_pago_paciente: number;
@@ -125,7 +139,11 @@ export async function getIndicadoresFinanceiros(
   const taxa_administrativa_recebida = rows.reduce((s, r) => s + Number(r.receita_plataforma_valor ?? 0), 0);
   const total_recebido_consultas = rows.reduce((s, r) => s + Number(r.total_pago_paciente ?? 0), 0);
   const total_agendamentos = total_recebido_consultas;
-  const total_plantao = 0;
+
+  const consultasMes = (consultasPeriodo ?? []) as Array<{ valor_consulta: number | null }>;
+  const totalConsultasMes = consultasMes.length;
+  const somaValorConsultas = consultasMes.reduce((s, c) => s + Number(c.valor_consulta ?? 0), 0);
+  const total_plantao = totalConsultasMes > 0 ? somaValorConsultas : 0;
 
   const { data: reembolsos } = await service
     .from("reembolso")

@@ -162,7 +162,7 @@ export type DetalhesConsulta = {
   };
 };
 
-/** Espelha a tabela consulta_documento (id, id_consulta, tipo, arquivo_url, assinado, created_at). */
+/** Espelha a tabela consulta_documento (id, id_consulta, tipo, arquivo_url, assinado, created_at, conteudo, conteudo_json). */
 export type DocItem = {
   id: string;
   id_consulta: string;
@@ -171,6 +171,8 @@ export type DocItem = {
   nome_arquivo: string | null;
   assinado: boolean;
   created_at: string;
+  conteudo: string | null;
+  conteudo_json: unknown | null;
 };
 
 /** Detalhes de uma consulta para a tela de detalhes. */
@@ -202,7 +204,7 @@ export async function getDetalhesConsulta(id: string): Promise<DetalhesConsulta 
   const [{ data: userPac }, medicoResult, docsResult] = await Promise.all([
     service.from("user").select("nome, profile_image").eq("id", row.id_paciente).maybeSingle(),
     service.from("user_medico").select("id, id_user, crm").eq("id", row.id_medico).maybeSingle(),
-    service.from("consulta_documento").select("id, id_consulta, tipo, arquivo_url, assinado, created_at").eq("id_consulta", row.id),
+    service.from("consulta_documento").select("id, id_consulta, tipo, arquivo_url, assinado, created_at, conteudo, conteudo_json").eq("id_consulta", row.id),
   ]);
 
   // consulta.id_medico → user_medico(id); user_medico.id_user → user(id). user_medico não tem coluna uf; uf vem de endereco.
@@ -233,6 +235,8 @@ export async function getDetalhesConsulta(id: string): Promise<DetalhesConsulta 
     arquivo_url: string | null;
     assinado: boolean;
     created_at: string;
+    conteudo: string | null;
+    conteudo_json: unknown;
   }>;
 
   const tipoNorm = (t: string) => String(t ?? "").toLowerCase().trim().replace(/\s+/g, "_") as string;
@@ -253,6 +257,8 @@ export async function getDetalhesConsulta(id: string): Promise<DetalhesConsulta 
     nome_arquivo: nomeArq(x.arquivo_url),
     assinado: x.assinado === true,
     created_at: x.created_at,
+    conteudo: x.conteudo ?? null,
+    conteudo_json: x.conteudo_json ?? null,
   });
 
   const [dataPart, timePart] = row.datahora.slice(0, 19).split("T");

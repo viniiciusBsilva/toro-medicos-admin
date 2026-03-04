@@ -54,7 +54,7 @@ export function AdminSidebar() {
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col border-r border-outline bg-surface transition-[width] duration-200",
+        "flex h-screen shrink-0 flex-col border-r border-outline bg-surface transition-[width] duration-200",
         width
       )}
     >

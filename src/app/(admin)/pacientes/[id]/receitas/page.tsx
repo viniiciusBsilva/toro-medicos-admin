@@ -11,5 +11,11 @@ export default async function ReceitasPage({
   const paciente = await getDetalhesPaciente(id);
   if (!paciente) notFound();
   const receitas = await getReceitasPaciente(paciente.id_user);
-  return <ReceitasClient pacienteId={id} receitas={receitas} />;
+  return (
+    <ReceitasClient
+      pacienteId={id}
+      pacienteNome={paciente.nome}
+      receitas={receitas}
+    />
+  );
 }

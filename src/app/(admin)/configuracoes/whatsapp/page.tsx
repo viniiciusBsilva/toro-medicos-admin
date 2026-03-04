@@ -25,7 +25,7 @@ export default function EditarWhatsAppPage() {
 
   useEffect(() => {
     getConfiguracoes().then((c) => {
-      setNumero(c.whatsapp_suporte ?? "");
+      setNumero(c.whatsapp_suporte ? formatTelefone(c.whatsapp_suporte) : "");
     });
   }, []);
 
@@ -45,8 +45,7 @@ export default function EditarWhatsAppPage() {
       const result = await updateWhatsappSuporte(digits);
       if (result.ok) {
         toast.success("WhatsApp do suporte atualizado.");
-        router.push("/configuracoes");
-        router.refresh();
+        await router.push("/configuracoes");
       } else {
         toast.error(result.error ?? "Erro ao salvar.");
       }

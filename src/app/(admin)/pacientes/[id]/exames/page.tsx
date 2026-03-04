@@ -11,5 +11,11 @@ export default async function ExamesPage({
   const paciente = await getDetalhesPaciente(id);
   if (!paciente) notFound();
   const exames = await getExamesPaciente(id, paciente.id_user);
-  return <ExamesClient pacienteId={id} exames={exames} />;
+  return (
+    <ExamesClient
+      pacienteId={id}
+      pacienteNome={paciente.nome}
+      exames={exames}
+    />
+  );
 }

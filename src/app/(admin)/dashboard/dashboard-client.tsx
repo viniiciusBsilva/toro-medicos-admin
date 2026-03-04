@@ -2,8 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -47,7 +46,6 @@ export function DashboardClient({ initialData, initialAnoMes }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [anoMes, setAnoMes] = useState(initialAnoMes);
-  const [busca, setBusca] = useState(searchParams.get("q") ?? "");
   const [data, setData] = useState(initialData);
   const [isPending, startTransition] = useTransition();
 
@@ -57,8 +55,6 @@ export function DashboardClient({ initialData, initialAnoMes }: Props) {
   function atualizarUrl(nextAnoMes: string) {
     const p = new URLSearchParams(searchParams.toString());
     p.set("anoMes", nextAnoMes);
-    if (busca) p.set("q", busca);
-    else p.delete("q");
     router.push(`/dashboard?${p.toString()}`, { scroll: false });
   }
 
@@ -84,13 +80,6 @@ export function DashboardClient({ initialData, initialAnoMes }: Props) {
     });
   }
 
-  function handleBusca(e: React.FormEvent) {
-    e.preventDefault();
-    const p = new URLSearchParams(searchParams.toString());
-    busca ? p.set("q", busca) : p.delete("q");
-    router.push(`/dashboard?${p.toString()}`, { scroll: false });
-  }
-
   const percentReembolsadas =
     data.totalConsultas > 0
       ? Math.round((data.totalReembolsadas / data.totalConsultas) * 100)
@@ -105,19 +94,7 @@ export function DashboardClient({ initialData, initialAnoMes }: Props) {
     <div className="space-y-8">
       <header className="space-y-4">
         <h1 className="text-2xl font-semibold text-[#0E1015]">Dashboard</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <form onSubmit={handleBusca} className="min-w-0 flex-1">
-            <div className="relative">
-              <Input
-                type="search"
-                placeholder="Pesquisar por cidade ou estado"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="h-11 w-full rounded-full border border-outline bg-white pl-4 pr-11 text-[var(--text-bodyText)] placeholder:text-[var(--text-lessImportantText)]"
-              />
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-lessImportantText)]" />
-            </div>
-          </form>
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="flex items-center gap-1">
             <button
               type="button"

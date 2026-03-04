@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, Paperclip, Download, Eye, Share2 } from "lucide-react";
+import { ChevronLeft, Paperclip, Download, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { ExameItem } from "../../actions";
+import {
+  documentoTemDados,
+  gerarPdfDocumento,
+} from "@/lib/pdf-documento";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -17,20 +21,66 @@ function formatDate(iso: string | null): string {
 
 type Props = {
   pacienteId: string;
+  pacienteNome: string;
   exames: ExameItem[];
 };
 
-export function ExamesClient({ pacienteId, exames }: Props) {
-  function handleCompartilhar(url: string | null) {
-    if (!url) return;
-    if (navigator.share) {
-      navigator.share({
-        title: "Exame",
-        url,
-      }).catch(() => window.open(url, "_blank"));
-    } else {
-      window.open(url, "_blank");
+function exameTemDados(ex: ExameItem): boolean {
+  return documentoTemDados({
+    arquivo_url: ex.arquivo_url,
+    conteudo: ex.conteudo ?? null,
+    conteudo_json: ex.conteudo_json ?? null,
+  });
+}
+
+export function ExamesClient({ pacienteId, pacienteNome, exames }: Props) {
+  function getCabecalho(ex: ExameItem) {
+    return {
+      medico_nome: ex.medico_nome ?? null,
+      paciente_nome: pacienteNome,
+      data_emissao: ex.solicitado_em ?? ex.created_at,
+    };
+  }
+
+  function getUrlParaVisualizar(ex: ExameItem): string | null {
+    if (ex.arquivo_url) return ex.arquivo_url;
+    const blob = gerarPdfDocumento(
+      "pedido_exame",
+      ex.conteudo ?? null,
+      ex.conteudo_json ?? null,
+      getCabecalho(ex)
+    );
+    if (!blob) return null;
+    return URL.createObjectURL(blob);
+  }
+
+  function handleVisualizar(ex: ExameItem) {
+    const url = getUrlParaVisualizar(ex);
+    if (url) window.open(url, "_blank");
+  }
+
+  function handleDownload(ex: ExameItem) {
+    if (ex.arquivo_url) {
+      const a = document.createElement("a");
+      a.href = ex.arquivo_url;
+      a.download = ex.arquivo_url.split("/").pop() ?? "exame.pdf";
+      a.target = "_blank";
+      a.click();
+      return;
     }
+    const blob = gerarPdfDocumento(
+      "pedido_exame",
+      ex.conteudo ?? null,
+      ex.conteudo_json ?? null,
+      getCabecalho(ex)
+    );
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pedido-exame-${ex.id.slice(0, 8)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -54,71 +104,66 @@ export function ExamesClient({ pacienteId, exames }: Props) {
         </Card>
       ) : (
         <ul className="space-y-4">
-          {exames.map((ex) => (
-            <li key={ex.id}>
-              <Card>
-                <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
-                  <div className="space-y-2 min-w-0 flex-1">
-                    <h3 className="font-medium text-text-primary">{ex.titulo}</h3>
-                    <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
-                      <span>Solicitado em: {formatDate(ex.solicitado_em)}</span>
-                      {ex.medico_nome && <span>Médico: {ex.medico_nome}</span>}
-                      {ex.data_consulta && (
-                        <span>Data da consulta: {formatDate(ex.data_consulta)}</span>
-                      )}
+          {exames.map((ex) => {
+            const temDados = exameTemDados(ex);
+            return (
+              <li key={ex.id}>
+                <Card>
+                  <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
+                    <div className="space-y-2 min-w-0 flex-1">
+                      <h3 className="font-medium text-text-primary">{ex.titulo}</h3>
+                      <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
+                        <span>Solicitado em: {formatDate(ex.solicitado_em)}</span>
+                        {ex.medico_nome && <span>Médico: {ex.medico_nome}</span>}
+                        {ex.data_consulta && (
+                          <span>Data da consulta: {formatDate(ex.data_consulta)}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-text-secondary">
+                        {ex.arquivo_url ? (
+                          <>
+                            <Paperclip className="h-4 w-4 shrink-0" />
+                            <a
+                              href={ex.arquivo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate underline hover:text-primary"
+                            >
+                              {ex.arquivo_url.split("/").pop() ?? "Arquivo"}
+                            </a>
+                          </>
+                        ) : temDados ? (
+                          <span className="text-text-primary">Documento disponível para visualização</span>
+                        ) : (
+                          <span className="text-amber-600">Nenhum exame anexado</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-text-secondary">
-                      {ex.arquivo_url ? (
-                        <>
-                          <Paperclip className="h-4 w-4 shrink-0" />
-                          <a
-                            href={ex.arquivo_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate underline hover:text-primary"
-                          >
-                            {ex.arquivo_url.split("/").pop() ?? "Arquivo"}
-                          </a>
-                        </>
-                      ) : (
-                        <span className="text-amber-600">Nenhum exame anexado</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      className="bg-primary hover:bg-primary-hover"
-                      disabled={!ex.arquivo_url}
-                      onClick={() => ex.arquivo_url && window.open(ex.arquivo_url!, "_blank")}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Visualizar
-                    </Button>
-                    <button
-                      type="button"
-                      className="text-sm font-medium text-primary hover:underline"
-                      onClick={() => handleCompartilhar(ex.arquivo_url ?? null)}
-                    >
-                      Compartilhar
-                    </button>
-                    {ex.arquivo_url && (
-                      <a
-                        href={ex.arquivo_url}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded p-2 text-text-secondary hover:bg-muted hover:text-text-primary"
-                        title="Download"
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
+                    {temDados && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          className="bg-primary hover:bg-primary-hover"
+                          onClick={() => handleVisualizar(ex)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Visualizar
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(ex)}
+                          className="rounded p-2 text-text-secondary hover:bg-muted hover:text-text-primary"
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            </li>
-          ))}
+                  </CardContent>
+                </Card>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

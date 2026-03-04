@@ -23,9 +23,9 @@ export default async function AdminLayout({
   }
   return (
     <AdminLayoutClient initial={initial}>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex h-screen overflow-hidden bg-background">
         <AdminSidebar />
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
           <AdminTopbar />
           <main className="flex-1 p-8">{children}</main>
         </div>

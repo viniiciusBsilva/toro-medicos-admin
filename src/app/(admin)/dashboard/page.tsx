@@ -4,7 +4,7 @@ import { DashboardClient } from "./dashboard-client";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ anoMes?: string; q?: string }>;
+  searchParams: Promise<{ anoMes?: string }>;
 }) {
   const params = await searchParams;
   const now = new Date();

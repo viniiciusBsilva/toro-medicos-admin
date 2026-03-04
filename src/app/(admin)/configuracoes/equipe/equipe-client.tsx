@@ -186,7 +186,7 @@ export function EquipeClient({ membrosIniciais }: { membrosIniciais: MembroEquip
       const result = await salvarPermissoes(selected.id_admin, payload);
       if (result.ok) {
         toast.success("Alterações salvas.");
-        getPermissoesAdmin(selected.id_admin).then(setPermissoes);
+        getPermissoesAdmin(selected.id_admin).then((p) => setPayload(toPayload(p)));
       } else {
         toast.error(result.error ?? "Erro ao salvar.");
       }

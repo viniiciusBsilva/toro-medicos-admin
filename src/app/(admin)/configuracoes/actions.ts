@@ -63,21 +63,26 @@ async function getFinanceiroConfigAtivoId(
   return (data as { id: string }).id;
 }
 
-/** Configurações gerais: whatsapp da tabela configuracoes; taxa_reembolso de financeiro_config. */
+/** Extrai os dígitos do número a partir do link do WhatsApp (ex: wa.me/5511999999999). */
+function extrairNumeroDoLinkWhatsApp(link: string | null): string | null {
+  if (!link || !link.trim()) return null;
+  const match = link.trim().match(/wa\.me\/55(\d{10,11})/i);
+  return match ? match[1] : null;
+}
+
+/** Configurações gerais: whatsapp da tabela links_ (nome=suporte); taxa_reembolso de financeiro_config. */
 export async function getConfiguracoes(): Promise<ConfiguracoesValores> {
   try {
     const service = createServiceClient();
     const configId = await getFinanceiroConfigAtivoId(service);
-    const [configRow, financeiroRow] = await Promise.all([
-      service.from("configuracoes").select("whatsapp_suporte").limit(1).maybeSingle(),
+    const [linksRow, financeiroRow] = await Promise.all([
+      service.from("links_").select("link").eq("nome", "suporte").limit(1).maybeSingle(),
       configId
         ? service.from("financeiro_config").select("taxa_reembolso").eq("id", configId).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
-    const whatsapp =
-      configRow.data && !configRow.error
-        ? (configRow.data as { whatsapp_suporte: string | null }).whatsapp_suporte ?? null
-        : null;
+    const link = linksRow.data && !linksRow.error ? (linksRow.data as { link: string | null }).link ?? null : null;
+    const whatsapp = extrairNumeroDoLinkWhatsApp(link);
     let percentual_reembolso_24h: number | null = 50;
     if (financeiroRow.data && !financeiroRow.error) {
       const val = (financeiroRow.data as { taxa_reembolso: number }).taxa_reembolso;
@@ -89,26 +94,32 @@ export async function getConfiguracoes(): Promise<ConfiguracoesValores> {
   }
 }
 
+/** Atualiza o link do WhatsApp do suporte na tabela links_ (nome=suporte). Salva como https://wa.me/55 + dígitos. */
 export async function updateWhatsappSuporte(
   numero: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const service = createServiceClient();
+    const digits = numero.replace(/\D/g, "").trim();
+    const link = digits.length >= 10 ? `https://wa.me/55${digits}` : null;
+
     const { data: existing } = await service
-      .from("configuracoes")
+      .from("links_")
       .select("id")
+      .eq("nome", "suporte")
       .limit(1)
       .maybeSingle();
+
     if (existing) {
       const { error } = await service
-        .from("configuracoes")
-        .update({ whatsapp_suporte: numero.trim() || null })
-        .eq("id", (existing as { id: string }).id);
+        .from("links_")
+        .update({ link })
+        .eq("id", (existing as { id: number }).id);
       if (error) return { ok: false, error: error.message };
     } else {
-      const { error } = await service.from("configuracoes").insert({
-        whatsapp_suporte: numero.trim() || null,
-        percentual_reembolso_24h: 50,
+      const { error } = await service.from("links_").insert({
+        nome: "suporte",
+        link,
       });
       if (error) return { ok: false, error: error.message };
     }
